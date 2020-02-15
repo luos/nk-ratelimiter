@@ -1,14 +1,19 @@
-# Simple Rate Limiter
+# Rate Limiter
 
 A simple rate limiter to limit requests made to API endpoints or any other resource. 
 
 
 ## Installation
 
-Use the package manager [pip](https://pip.pypa.io/en/stable/) to install foobar.
+As it's not in any repositories you have to use it as a source dependency: 
 
 ```sbt
-pip install foobar
+
+val nkRatelimiter = RootProject(uri("git://github.com/luos/nk-ratelimiter.git"))
+
+lazy val root = (project in file("."))
+    .dependsOn(nkRatelimiter)
+
 ```
 
 ## Usage
