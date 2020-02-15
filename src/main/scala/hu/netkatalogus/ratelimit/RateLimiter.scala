@@ -1,31 +1,48 @@
 package hu.netkatalogus.ratelimit
 
 import java.time.LocalDateTime
-import java.time.temporal.{ChronoUnit, TemporalUnit}
-import java.util.concurrent.{ConcurrentHashMap, TimeUnit}
+import java.time.temporal.ChronoUnit
+import java.util.concurrent.ConcurrentHashMap
 
 import hu.netkatalogus.ratelimit.RateLimiter.{Blocked, LimiterConfig, Result, Success}
 
-import scala.collection.mutable
-import scala.concurrent.duration.{FiniteDuration, TimeUnit}
+import scala.concurrent.duration.FiniteDuration
 
 object RateLimiter {
 
+  /**
+   * @param endpointName Name of the endpoint, will be visible in log messages
+   * @param limit        Number of requests in the given duration
+   * @param duration
+   * @param identity     You can provide a function here to derive a rate limiter key from any object,
+   *                     For example in Play you have the Request[_] object for any request, you can say that
+   *                     this should be the remote IP address (watch out if you use a load balancer, it maybe its IP)
+   *                     (r: Request[AnyContent]) => r.remoteAddress
+   * @tparam T
+   */
   case class LimiterConfig[T](endpointName: String,
                               limit: Int,
                               duration: FiniteDuration,
                               identity: (T) => String
                              )
 
-  class Result[T]
+  sealed class Result[T]
 
   case class Success[T](value: T) extends Result[T]
 
   case class Blocked[T]() extends Result[T]
 
-
 }
 
+/**
+ * Limits access to the $endpointName resource, keeps track of the last $limit number of timestamps the resource
+ * was accessed.
+ * In some small percentage of requests it cleans up the now stale keys.
+ *
+ * @param limiterConfig
+ * @param logger
+ * @tparam Id
+ */
 class RateLimiter[Id](limiterConfig: LimiterConfig[Id], logger: {def warn(s: String): Unit}) {
   private val accesses = new ConcurrentHashMap[String, Seq[LocalDateTime]]
 
@@ -42,7 +59,7 @@ class RateLimiter[Id](limiterConfig: LimiterConfig[Id], logger: {def warn(s: Str
   }
 
   private
-  def maybeCleanup = {
+  def maybeCleanup(): Unit = {
     if (scala.util.Random.nextDouble() < 0.02) {
       cleanup(allowedTime)
     }
@@ -69,7 +86,6 @@ class RateLimiter[Id](limiterConfig: LimiterConfig[Id], logger: {def warn(s: Str
         true
       }
     }
-
   }
 
   private
@@ -92,5 +108,5 @@ class RateLimiter[Id](limiterConfig: LimiterConfig[Id], logger: {def warn(s: Str
 
   def cleanup(): Unit = cleanup(allowedTime)
 
-  def keyCount = accesses.mappingCount()
+  def keyCount: Long = accesses.mappingCount()
 }
